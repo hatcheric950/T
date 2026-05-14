@@ -12,7 +12,7 @@ from .config import SESSIONS_DIR, ensure_dirs
 @dataclass
 class Message:
     role: str
-    content: str
+    content: object  # str or list[dict] (Anthropic structured content blocks)
     ts: float = field(default_factory=time.time)
 
 

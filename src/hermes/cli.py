@@ -76,7 +76,7 @@ def _run_single(agent: Agent, query: str) -> int:
     except Exception as e:
         console.print(f"[red]error:[/red] {e}")
         return 1
-    console.print(Markdown(reply))
+    console.print(Markdown(reply if isinstance(reply, str) else str(reply)))
     console.print(f"\n[dim]session: {agent.session.id}[/dim]")
     return 0
 

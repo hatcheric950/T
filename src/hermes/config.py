@@ -11,6 +11,12 @@ SKILLS_DIR = HERMES_HOME / "skills"
 
 DEFAULT_MODEL = "anthropic/claude-sonnet-4-6"
 DEFAULT_TOOLSETS = ("web", "terminal", "skills")
+BUILTIN_TOOLSETS = frozenset({"web", "terminal", "skills"})
+
+
+def mcp_config_paths() -> list[Path]:
+    """Repo-local config (./.hermes/mcp.json) takes precedence over user-global."""
+    return [Path.cwd() / ".hermes" / "mcp.json", HERMES_HOME / "mcp.json"]
 
 
 @dataclass

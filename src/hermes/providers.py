@@ -29,6 +29,16 @@ class AnthropicProvider:
         )
         return "".join(block.text for block in resp.content if block.type == "text")
 
+    def complete_with_tools(self, model: str, messages: list[dict], system: str,
+                            tools: list[dict]):
+        """Returns the raw Anthropic response so the agent can run a tool loop."""
+        model_id = model.split("/", 1)[1] if "/" in model else model
+        kwargs: dict = {"model": model_id, "max_tokens": 4096,
+                        "system": system, "messages": messages}
+        if tools:
+            kwargs["tools"] = tools
+        return self.client.messages.create(**kwargs)
+
 
 class OpenAICompatibleProvider:
     """Used for OpenRouter, Nous Portal, and similar OpenAI-compatible endpoints."""
