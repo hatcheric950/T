@@ -4,9 +4,15 @@ A multi-provider chat CLI agent.
 
 ## Install
 
+Requires Python 3.10+.
+
 ```bash
-pip install -e .
+pip install -e ".[dev]"   # runtime + test deps
+hermes --version          # sanity check -> hermes 0.1.0
+python -m pytest -q       # run the test suite
 ```
+
+For runtime only (no tests): `pip install -e .`
 
 ## Usage
 
