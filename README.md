@@ -95,3 +95,23 @@ hermes chat --toolsets hostinger -q "list my domains"
 
 Currently supported transport: `stdio`. Tool calls work with
 `--provider anthropic` (default).
+
+## Releasing
+
+Releases are published to PyPI by `.github/workflows/release.yml` when a
+`v*` tag is pushed. The package version is single-sourced from
+`src/hermes/__init__.py` (`__version__`).
+
+```bash
+# 1. bump the version
+#    edit src/hermes/__init__.py -> __version__ = "X.Y.Z"
+# 2. commit, tag, push
+git commit -am "Release vX.Y.Z"
+git tag vX.Y.Z
+git push && git push --tags
+```
+
+The workflow checks the tag matches `__version__`, builds the sdist +
+wheel, and uploads to PyPI via trusted publishing (OIDC) — no API token is
+stored. One-time setup: register a PyPI trusted publisher for this repo
+with workflow `release.yml` and environment `pypi`.

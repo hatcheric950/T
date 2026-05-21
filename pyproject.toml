@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hermes-bot"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Hermes: a multi-provider chat CLI agent"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -22,6 +22,9 @@ hermes = "hermes.cli:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+
+[tool.setuptools.dynamic]
+version = { attr = "hermes.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
