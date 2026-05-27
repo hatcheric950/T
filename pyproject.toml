@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "happy"
+version = "0.1.0"
+description = "Lightweight AI provider connection manager"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+claude = ["anthropic>=0.25"]
+
+[project.scripts]
+happy = "happy.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
