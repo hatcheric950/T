@@ -12,9 +12,9 @@ def _connect_claude() -> None:
     api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
     if not api_key:
         sys.exit(
-            "error: ANTHROPIC_API_KEY environment variable is not set.\n"
-            "Export your key and retry:\n"
-            "  export ANTHROPIC_API_KEY=sk-ant-..."
+            "error: ANTHROPIC_API_KEY is not set.\n"
+            "Export your key or add it to ~/.happy/.env:\n"
+            "  ANTHROPIC_API_KEY=sk-ant-..."
         )
 
     print("Connecting to Claude (Anthropic)…", flush=True)

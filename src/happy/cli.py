@@ -7,6 +7,7 @@ import sys
 
 from . import __version__
 from . import connect as connect_mod
+from . import env as env_mod
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -34,6 +35,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> None:
+    env_mod.load_dotenv_files()
     parser = build_parser()
     args = parser.parse_args(argv)
 
