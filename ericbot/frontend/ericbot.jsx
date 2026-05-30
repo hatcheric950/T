@@ -666,6 +666,182 @@ function DraftTab() {
   );
 }
 
+// ── Inbox Tab (SMS auto-responder) ────────────────────────────────────────────
+
+const TIERS = {
+  business: { label: "Business", color: "#89b4fa", desc: "Drafts in your voice; routine replies can auto-send" },
+  personal: { label: "Personal", color: "#f5c2e7", desc: "Never auto-answered as you — honest away-reply + reminder" },
+  unknown: { label: "Unknown", color: "#6c7086", desc: "Logged + flagged for you; no auto-reply" },
+};
+
+function InboxTab() {
+  const [status, setStatus] = useState(null);
+  const [contacts, setContacts] = useState([]);
+  const [pending, setPending] = useState([]);
+  const [form, setForm] = useState({ name: "", phone: "", tier: "business", venture: "hatch", auto_send: false, away_mode: false, away_reply: "" });
+  const [showForm, setShowForm] = useState(false);
+  const [edits, setEdits] = useState({});
+
+  const load = async () => {
+    setStatus(await apiFetch("/sms/status"));
+    setContacts(await apiFetch("/sms/contacts"));
+    setPending(await apiFetch("/sms/pending"));
+  };
+  useEffect(() => { load(); }, []);
+
+  const createContact = async () => {
+    if (!form.phone.trim()) return;
+    await apiFetch("/sms/contacts", { method: "POST", body: JSON.stringify(form) });
+    setForm({ name: "", phone: "", tier: "business", venture: "hatch", auto_send: false, away_mode: false, away_reply: "" });
+    setShowForm(false);
+    load();
+  };
+
+  const setTier = async (id, tier) => {
+    await apiFetch(`/sms/contacts/${id}`, { method: "PATCH", body: JSON.stringify({ tier }) });
+    load();
+  };
+  const toggle = async (id, field, val) => {
+    await apiFetch(`/sms/contacts/${id}`, { method: "PATCH", body: JSON.stringify({ [field]: val }) });
+    load();
+  };
+
+  const approve = async (p) => {
+    await apiFetch(`/sms/pending/${p.id}/approve`, { method: "POST", body: JSON.stringify({ edited_text: edits[p.id] ?? p.draft }) });
+    load();
+  };
+  const reject = async (p) => {
+    await apiFetch(`/sms/pending/${p.id}/reject`, { method: "POST" });
+    load();
+  };
+
+  const inp = { background: "#1e1e2e", border: "1px solid #45475a", borderRadius: 6, color: "#cdd6f4", padding: "6px 10px", fontSize: 13, width: "100%" };
+  const sel = { ...inp, width: "auto" };
+
+  return (
+    <div>
+      {/* Status / safety banner */}
+      {status && (
+        <div style={{ background: "#1e1e2e", borderRadius: 12, padding: "12px 16px", marginBottom: 16, borderLeft: `3px solid ${status.configured ? "#a6e3a1" : "#f9e2af"}` }}>
+          <div style={{ fontSize: 13, color: "#cdd6f4" }}>
+            SMS gateway: <strong style={{ color: status.configured ? "#a6e3a1" : "#f9e2af" }}>{status.configured ? "connected" : "not configured"}</strong>
+            {"  ·  "}
+            Auto-send: <strong style={{ color: status.auto_send_enabled ? "#a6e3a1" : "#6c7086" }}>{status.auto_send_enabled ? "armed" : "off"}</strong>
+          </div>
+          <div style={{ fontSize: 12, color: "#6c7086", marginTop: 4 }}>
+            🔒 Personal contacts are never answered in your voice — they get an honest away-reply (if enabled) and a reminder pings you.
+          </div>
+        </div>
+      )}
+
+      {/* Approval queue */}
+      <Card title={`Approval Queue${pending.length ? ` (${pending.length})` : ""}`}>
+        {pending.length === 0 ? (
+          <p style={{ color: "#6c7086", fontSize: 13, margin: 0 }}>Nothing waiting. Drafts that need your eyes land here.</p>
+        ) : (
+          pending.map((p) => (
+            <div key={p.id} style={{ background: "#313244", borderRadius: 8, padding: 12, marginBottom: 10 }}>
+              <div style={{ fontSize: 12, color: "#6c7086", marginBottom: 6 }}>
+                To <strong style={{ color: "#cdd6f4" }}>{p.contact_name || p.phone}</strong>
+                {p.intent && <> · <em>{p.intent}</em></>}
+              </div>
+              <textarea
+                style={{ ...inp, minHeight: 60, resize: "vertical", marginBottom: 8 }}
+                value={edits[p.id] ?? p.draft}
+                onChange={(e) => setEdits((s) => ({ ...s, [p.id]: e.target.value }))}
+              />
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => approve(p)} style={{ background: "#a6e3a1", color: "#1e1e2e", border: "none", borderRadius: 6, padding: "6px 16px", fontWeight: 700, cursor: "pointer" }}>
+                  ✓ Approve &amp; Send
+                </button>
+                <button onClick={() => reject(p)} style={{ background: "#45475a", color: "#cdd6f4", border: "none", borderRadius: 6, padding: "6px 16px", cursor: "pointer" }}>
+                  Reject
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </Card>
+
+      {/* Contacts */}
+      <Card
+        title="Contacts"
+        action={
+          <button onClick={() => setShowForm(!showForm)} style={{ background: "#a6e3a1", color: "#1e1e2e", border: "none", borderRadius: 8, padding: "6px 14px", fontWeight: 700, cursor: "pointer" }}>
+            + Add
+          </button>
+        }
+      >
+        {showForm && (
+          <div style={{ background: "#313244", borderRadius: 8, padding: 12, marginBottom: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <input style={inp} placeholder="Name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+              <input style={inp} placeholder="Phone (+1555...)" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
+              <select style={sel} value={form.tier} onChange={(e) => setForm((f) => ({ ...f, tier: e.target.value }))}>
+                {Object.entries(TIERS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              </select>
+              <select style={sel} value={form.venture} onChange={(e) => setForm((f) => ({ ...f, venture: e.target.value }))}>
+                {Object.entries(VENTURES).map(([k, v]) => <option key={k} value={k}>{v.emoji} {v.label}</option>)}
+              </select>
+            </div>
+            <div style={{ fontSize: 12, color: "#6c7086", margin: "8px 0" }}>{TIERS[form.tier].desc}</div>
+            <div style={{ display: "flex", gap: 16, marginBottom: 8 }}>
+              {form.tier === "business" && (
+                <label style={{ fontSize: 13, color: "#cdd6f4", display: "flex", gap: 6, alignItems: "center" }}>
+                  <input type="checkbox" checked={form.auto_send} onChange={(e) => setForm((f) => ({ ...f, auto_send: e.target.checked }))} />
+                  Auto-send routine replies
+                </label>
+              )}
+              {form.tier === "personal" && (
+                <label style={{ fontSize: 13, color: "#cdd6f4", display: "flex", gap: 6, alignItems: "center" }}>
+                  <input type="checkbox" checked={form.away_mode} onChange={(e) => setForm((f) => ({ ...f, away_mode: e.target.checked }))} />
+                  Send honest away-reply
+                </label>
+              )}
+            </div>
+            <button onClick={createContact} style={{ background: "#89b4fa", color: "#1e1e2e", border: "none", borderRadius: 8, padding: "7px 18px", fontWeight: 700, cursor: "pointer" }}>
+              Save Contact
+            </button>
+          </div>
+        )}
+
+        {contacts.length === 0 ? (
+          <p style={{ color: "#6c7086", fontSize: 13, margin: 0 }}>No contacts yet. Add people so EricBot knows how to route their texts.</p>
+        ) : (
+          contacts.map((c) => (
+            <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #313244" }}>
+              <div>
+                <span style={{ fontWeight: 600, color: "#cdd6f4" }}>{c.name || c.phone}</span>
+                <span style={{ marginLeft: 8, fontSize: 12, color: "#6c7086" }}>{c.phone}</span>
+                <div style={{ marginTop: 4, display: "flex", gap: 6, alignItems: "center" }}>
+                  <Badge text={TIERS[c.tier]?.label || c.tier} color={TIERS[c.tier]?.color || "#6c7086"} />
+                  {c.tier === "business" && c.auto_send ? <Badge text="auto-send" color="#a6e3a1" /> : null}
+                  {c.tier === "personal" && c.away_mode ? <Badge text="away-reply" color="#f5c2e7" /> : null}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                {c.tier === "business" && (
+                  <button onClick={() => toggle(c.id, "auto_send", !c.auto_send)} style={{ background: "#313244", color: "#cdd6f4", border: "none", borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer" }}>
+                    {c.auto_send ? "Disable auto-send" : "Enable auto-send"}
+                  </button>
+                )}
+                {c.tier === "personal" && (
+                  <button onClick={() => toggle(c.id, "away_mode", !c.away_mode)} style={{ background: "#313244", color: "#cdd6f4", border: "none", borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer" }}>
+                    {c.away_mode ? "Disable away-reply" : "Enable away-reply"}
+                  </button>
+                )}
+                <select style={{ ...sel, fontSize: 12 }} value={c.tier} onChange={(e) => setTier(c.id, e.target.value)}>
+                  {Object.keys(TIERS).map((t) => <option key={t} value={t}>{TIERS[t].label}</option>)}
+                </select>
+              </div>
+            </div>
+          ))
+        )}
+      </Card>
+    </div>
+  );
+}
+
 // ── App Shell ─────────────────────────────────────────────────────────────────
 
 const TABS = [
@@ -673,6 +849,7 @@ const TABS = [
   { id: "chat", label: "Chat", emoji: "💬" },
   { id: "leads", label: "Leads", emoji: "🎯" },
   { id: "tasks", label: "Tasks", emoji: "✅" },
+  { id: "inbox", label: "Inbox", emoji: "📱" },
   { id: "voice", label: "Voice", emoji: "🎤" },
   { id: "draft", label: "Draft", emoji: "✍" },
 ];
@@ -685,6 +862,7 @@ export default function EricBot() {
     chat: <ChatTab />,
     leads: <LeadsTab />,
     tasks: <TasksTab />,
+    inbox: <InboxTab />,
     voice: <VoiceTab />,
     draft: <DraftTab />,
   };

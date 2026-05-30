@@ -124,3 +124,103 @@ Keep it under 100 words. Sound like a sharp business partner, not a cheerleader.
         messages=[{"role": "user", "content": prompt}],
     )
     return response.content[0].text
+
+
+# ── SMS auto-responder ────────────────────────────────────────────────────────
+
+import json
+
+
+async def classify_sms(body: str) -> dict:
+    """Lightweight triage of an inbound business text.
+
+    Returns {"routine": bool, "intent": str}. "routine" means a low-stakes
+    reply that's safe to auto-send (acknowledgements, simple scheduling
+    confirmations, thanks). Anything touching price, commitments, complaints,
+    or anything ambiguous is NOT routine and must go to the approval queue.
+    """
+    prompt = f"""Classify this inbound business text message.
+
+Message: "{body}"
+
+Respond with ONLY a JSON object, no other text:
+{{"routine": true|false, "intent": "<3-5 word summary>"}}
+
+"routine" is true ONLY for low-stakes replies safe to send without review:
+simple acknowledgements, "thanks", confirming you got something, basic
+availability. Set "routine" to false for anything involving pricing, quotes,
+scheduling a job, commitments, complaints, contracts, or anything unclear."""
+
+    try:
+        response = await get_client().messages.create(
+            model=MODEL,
+            max_tokens=80,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = response.content[0].text.strip()
+        # Tolerate code fences or stray prose around the JSON.
+        start, end = text.find("{"), text.rfind("}")
+        data = json.loads(text[start : end + 1]) if start >= 0 else {}
+        return {
+            "routine": bool(data.get("routine", False)),
+            "intent": str(data.get("intent", "general"))[:60],
+        }
+    except Exception:
+        # Fail closed: if we can't classify, treat it as needing review.
+        return {"routine": False, "intent": "needs review"}
+
+
+async def draft_sms_reply(
+    recipient_name: str,
+    venture: str,
+    inbound: str,
+    style_context: str = "",
+    history: Optional[List[Dict]] = None,
+) -> str:
+    """Draft a business SMS reply in Eric's voice."""
+    system = ERIC_SYSTEM
+    if style_context:
+        system += f"\n\n{style_context}"
+
+    convo = ""
+    if history:
+        lines = [f"{'Them' if m['direction'] == 'in' else 'Eric'}: {m['body']}" for m in history[-6:]]
+        convo = "Recent thread:\n" + "\n".join(lines) + "\n\n"
+
+    prompt = f"""{convo}{recipient_name} just texted: "{inbound}"
+
+Draft Eric's reply as a text message. Keep it short, natural, the way Eric
+texts — first person, his voice. Just the message body, nothing else."""
+
+    response = await get_client().messages.create(
+        model=MODEL,
+        max_tokens=300,
+        system=system,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return response.content[0].text.strip()
+
+
+async def generate_away_reply(recipient_name: str, style_context: str = "") -> str:
+    """An HONEST 'I'm tied up' status text — never pretends Eric is present.
+
+    This is intentionally transparent: it signals Eric is unavailable and will
+    follow up. It does not impersonate a live conversation.
+    """
+    system = ERIC_SYSTEM
+    if style_context:
+        system += f"\n\n{style_context}"
+
+    prompt = f"""Write a short, honest auto-reply text to {recipient_name} letting
+them know Eric is tied up right now and will get back to them personally soon.
+
+It must be transparent that this is a quick heads-up, NOT a full conversation.
+Sound like Eric, keep it warm and brief. Just the message body."""
+
+    response = await get_client().messages.create(
+        model=MODEL,
+        max_tokens=120,
+        system=system,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return response.content[0].text.strip()

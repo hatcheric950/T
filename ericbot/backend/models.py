@@ -85,3 +85,35 @@ class DraftRequest(BaseModel):
     channel: str = Field(..., description="email|text|social|phone")
     context: str = Field(..., description="What this outreach is about")
     tone: str = "friendly"
+
+
+# ── SMS auto-responder ────────────────────────────────────────────────────────
+
+
+class ContactCreate(BaseModel):
+    name: Optional[str] = None
+    phone: str = Field(..., description="E.164 format, e.g. +15555550123")
+    tier: str = Field("unknown", description="business|personal|unknown")
+    venture: Optional[str] = None
+    auto_send: bool = False
+    away_mode: bool = False
+    away_reply: Optional[str] = None
+
+
+class ContactUpdate(BaseModel):
+    name: Optional[str] = None
+    tier: Optional[str] = None
+    venture: Optional[str] = None
+    auto_send: Optional[bool] = None
+    away_mode: Optional[bool] = None
+    away_reply: Optional[str] = None
+
+
+class ApprovalRequest(BaseModel):
+    # Optional edited text — if omitted, the original draft is sent as-is.
+    edited_text: Optional[str] = None
+
+
+class ManualSend(BaseModel):
+    phone: str
+    body: str

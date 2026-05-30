@@ -53,5 +53,47 @@ async def init_db():
                 content TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
+
+            -- SMS auto-responder ---------------------------------------------
+
+            CREATE TABLE IF NOT EXISTS contacts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT,
+                phone TEXT NOT NULL UNIQUE,
+                -- tier drives how inbound texts are handled:
+                --   business : draft in Eric's voice, may auto-send routine replies
+                --   personal : NEVER impersonate Eric; honest away-reply + remind Eric
+                --   unknown  : log + remind Eric, no automatic reply
+                tier TEXT NOT NULL DEFAULT 'unknown',
+                venture TEXT,
+                -- per-contact opt-in for auto-sending routine business replies
+                auto_send INTEGER DEFAULT 0,
+                -- per-contact honest away-reply (sent at most once per inbound burst)
+                away_mode INTEGER DEFAULT 0,
+                away_reply TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS sms_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                contact_id INTEGER,
+                phone TEXT NOT NULL,
+                direction TEXT NOT NULL,           -- 'in' | 'out'
+                body TEXT NOT NULL,
+                -- received | auto_sent | pending | approved | away_reply | manual
+                status TEXT NOT NULL DEFAULT 'received',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS pending_replies (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                contact_id INTEGER,
+                phone TEXT NOT NULL,
+                inbound_message_id INTEGER,
+                draft TEXT NOT NULL,
+                intent TEXT,
+                resolved INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
         """)
         await db.commit()

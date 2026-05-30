@@ -7,3 +7,4 @@ pydantic==2.10.3
 aiosqlite==0.20.0
 httpx==0.28.1
 python-multipart==0.0.20
+twilio==9.3.7
