@@ -49,10 +49,10 @@ async def create_contact(contact: ContactCreate, db: aiosqlite.Connection = Depe
         raise HTTPException(status_code=422, detail=f"tier must be one of: {', '.join(VALID_TIERS)}")
     try:
         async with db.execute(
-            """INSERT INTO contacts (name, phone, tier, venture, auto_send, away_mode, away_reply)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO contacts (name, phone, tier, venture, auto_send, protected, away_mode, away_reply)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
             (contact.name, contact.phone, contact.tier, contact.venture,
-             int(contact.auto_send), int(contact.away_mode), contact.away_reply),
+             int(contact.auto_send), int(contact.protected), int(contact.away_mode), contact.away_reply),
         ) as cur:
             contact_id = cur.lastrowid
         await db.commit()

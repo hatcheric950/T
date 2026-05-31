@@ -96,6 +96,8 @@ class ContactCreate(BaseModel):
     tier: str = Field("unknown", description="business|personal|unknown")
     venture: Optional[str] = None
     auto_send: bool = False
+    # protected = True means NEVER answer in Eric's voice (spouse, etc.)
+    protected: bool = False
     away_mode: bool = False
     away_reply: Optional[str] = None
 
@@ -105,6 +107,7 @@ class ContactUpdate(BaseModel):
     tier: Optional[str] = None
     venture: Optional[str] = None
     auto_send: Optional[bool] = None
+    protected: Optional[bool] = None
     away_mode: Optional[bool] = None
     away_reply: Optional[str] = None
 

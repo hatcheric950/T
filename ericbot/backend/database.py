@@ -60,15 +60,20 @@ async def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT,
                 phone TEXT NOT NULL UNIQUE,
-                -- tier drives how inbound texts are handled:
-                --   business : draft in Eric's voice, may auto-send routine replies
-                --   personal : NEVER impersonate Eric; honest away-reply + remind Eric
-                --   unknown  : log + remind Eric, no automatic reply
+                -- tier: business | personal | unknown
+                --   business : may auto-send routine replies
+                --   personal : draft in voice + queue, no auto-send
+                --   unknown  : draft in voice + queue, no auto-send
                 tier TEXT NOT NULL DEFAULT 'unknown',
                 venture TEXT,
-                -- per-contact opt-in for auto-sending routine business replies
+                -- per-contact opt-in for auto-sending routine BUSINESS replies
                 auto_send INTEGER DEFAULT 0,
-                -- per-contact honest away-reply (sent at most once per inbound burst)
+                -- protected = 1 means NEVER answer in Eric's voice.
+                -- Only use this for people where impersonation would be a trust
+                -- issue (e.g. spouse). protected contacts get an honest
+                -- away-reply (if away_mode is on) + a reminder to Eric.
+                protected INTEGER DEFAULT 0,
+                -- per-contact honest away-reply (only sent when protected=1)
                 away_mode INTEGER DEFAULT 0,
                 away_reply TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

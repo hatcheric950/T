@@ -670,15 +670,15 @@ function DraftTab() {
 
 const TIERS = {
   business: { label: "Business", color: "#89b4fa", desc: "Drafts in your voice; routine replies can auto-send" },
-  personal: { label: "Personal", color: "#f5c2e7", desc: "Never auto-answered as you — honest away-reply + reminder" },
-  unknown: { label: "Unknown", color: "#6c7086", desc: "Logged + flagged for you; no auto-reply" },
+  personal: { label: "Personal", color: "#f5c2e7", desc: "Drafts in your voice and queues for approval — no auto-send" },
+  unknown: { label: "Unknown", color: "#6c7086", desc: "Drafts in your voice and queues for approval" },
 };
 
 function InboxTab() {
   const [status, setStatus] = useState(null);
   const [contacts, setContacts] = useState([]);
   const [pending, setPending] = useState([]);
-  const [form, setForm] = useState({ name: "", phone: "", tier: "business", venture: "hatch", auto_send: false, away_mode: false, away_reply: "" });
+  const [form, setForm] = useState({ name: "", phone: "", tier: "business", venture: "hatch", auto_send: false, protected: false, away_mode: false });
   const [showForm, setShowForm] = useState(false);
   const [edits, setEdits] = useState({});
 
@@ -692,7 +692,7 @@ function InboxTab() {
   const createContact = async () => {
     if (!form.phone.trim()) return;
     await apiFetch("/sms/contacts", { method: "POST", body: JSON.stringify(form) });
-    setForm({ name: "", phone: "", tier: "business", venture: "hatch", auto_send: false, away_mode: false, away_reply: "" });
+    setForm({ name: "", phone: "", tier: "business", venture: "hatch", auto_send: false, protected: false, away_mode: false });
     setShowForm(false);
     load();
   };
@@ -720,7 +720,7 @@ function InboxTab() {
 
   return (
     <div>
-      {/* Status / safety banner */}
+      {/* Status banner */}
       {status && (
         <div style={{ background: "#1e1e2e", borderRadius: 12, padding: "12px 16px", marginBottom: 16, borderLeft: `3px solid ${status.configured ? "#a6e3a1" : "#f9e2af"}` }}>
           <div style={{ fontSize: 13, color: "#cdd6f4" }}>
@@ -729,7 +729,7 @@ function InboxTab() {
             Auto-send: <strong style={{ color: status.auto_send_enabled ? "#a6e3a1" : "#6c7086" }}>{status.auto_send_enabled ? "armed" : "off"}</strong>
           </div>
           <div style={{ fontSize: 12, color: "#6c7086", marginTop: 4 }}>
-            🔒 Personal contacts are never answered in your voice — they get an honest away-reply (if enabled) and a reminder pings you.
+            EricBot drafts replies in your voice for everyone. 🔒 <strong style={{ color: "#f38ba8" }}>Protected</strong> contacts (e.g. your wife) never get an in-voice reply — honest away-reply only + you get a reminder.
           </div>
         </div>
       )}
@@ -781,18 +781,23 @@ function InboxTab() {
                 {Object.entries(TIERS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
               </select>
               <select style={sel} value={form.venture} onChange={(e) => setForm((f) => ({ ...f, venture: e.target.value }))}>
+                <option value="">No venture</option>
                 {Object.entries(VENTURES).map(([k, v]) => <option key={k} value={k}>{v.emoji} {v.label}</option>)}
               </select>
             </div>
-            <div style={{ fontSize: 12, color: "#6c7086", margin: "8px 0" }}>{TIERS[form.tier].desc}</div>
-            <div style={{ display: "flex", gap: 16, marginBottom: 8 }}>
+            <div style={{ fontSize: 12, color: "#6c7086", margin: "8px 0" }}>{TIERS[form.tier]?.desc}</div>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 8 }}>
               {form.tier === "business" && (
                 <label style={{ fontSize: 13, color: "#cdd6f4", display: "flex", gap: 6, alignItems: "center" }}>
                   <input type="checkbox" checked={form.auto_send} onChange={(e) => setForm((f) => ({ ...f, auto_send: e.target.checked }))} />
                   Auto-send routine replies
                 </label>
               )}
-              {form.tier === "personal" && (
+              <label style={{ fontSize: 13, color: "#f38ba8", display: "flex", gap: 6, alignItems: "center" }}>
+                <input type="checkbox" checked={form.protected} onChange={(e) => setForm((f) => ({ ...f, protected: e.target.checked, away_mode: e.target.checked ? f.away_mode : false }))} />
+                🔒 Protected (never answer in my voice)
+              </label>
+              {form.protected && (
                 <label style={{ fontSize: 13, color: "#cdd6f4", display: "flex", gap: 6, alignItems: "center" }}>
                   <input type="checkbox" checked={form.away_mode} onChange={(e) => setForm((f) => ({ ...f, away_mode: e.target.checked }))} />
                   Send honest away-reply
@@ -806,7 +811,7 @@ function InboxTab() {
         )}
 
         {contacts.length === 0 ? (
-          <p style={{ color: "#6c7086", fontSize: 13, margin: 0 }}>No contacts yet. Add people so EricBot knows how to route their texts.</p>
+          <p style={{ color: "#6c7086", fontSize: 13, margin: 0 }}>No contacts yet. Add people so EricBot knows how to handle their texts.</p>
         ) : (
           contacts.map((c) => (
             <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #313244" }}>
@@ -815,21 +820,23 @@ function InboxTab() {
                 <span style={{ marginLeft: 8, fontSize: 12, color: "#6c7086" }}>{c.phone}</span>
                 <div style={{ marginTop: 4, display: "flex", gap: 6, alignItems: "center" }}>
                   <Badge text={TIERS[c.tier]?.label || c.tier} color={TIERS[c.tier]?.color || "#6c7086"} />
-                  {c.tier === "business" && c.auto_send ? <Badge text="auto-send" color="#a6e3a1" /> : null}
-                  {c.tier === "personal" && c.away_mode ? <Badge text="away-reply" color="#f5c2e7" /> : null}
+                  {c.protected ? <Badge text="🔒 protected" color="#f38ba8" /> : null}
+                  {c.tier === "business" && c.auto_send && !c.protected ? <Badge text="auto-send" color="#a6e3a1" /> : null}
+                  {c.protected && c.away_mode ? <Badge text="away-reply" color="#f5c2e7" /> : null}
                 </div>
               </div>
               <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                {c.tier === "business" && (
+                {!c.protected && c.tier === "business" && (
                   <button onClick={() => toggle(c.id, "auto_send", !c.auto_send)} style={{ background: "#313244", color: "#cdd6f4", border: "none", borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer" }}>
                     {c.auto_send ? "Disable auto-send" : "Enable auto-send"}
                   </button>
                 )}
-                {c.tier === "personal" && (
-                  <button onClick={() => toggle(c.id, "away_mode", !c.away_mode)} style={{ background: "#313244", color: "#cdd6f4", border: "none", borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer" }}>
-                    {c.away_mode ? "Disable away-reply" : "Enable away-reply"}
-                  </button>
-                )}
+                <button
+                  onClick={() => toggle(c.id, "protected", !c.protected)}
+                  style={{ background: c.protected ? "#f38ba822" : "#313244", color: c.protected ? "#f38ba8" : "#6c7086", border: `1px solid ${c.protected ? "#f38ba8" : "#45475a"}`, borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer" }}
+                >
+                  {c.protected ? "🔒 Protected" : "Set protected"}
+                </button>
                 <select style={{ ...sel, fontSize: 12 }} value={c.tier} onChange={(e) => setTier(c.id, e.target.value)}>
                   {Object.keys(TIERS).map((t) => <option key={t} value={t}>{TIERS[t].label}</option>)}
                 </select>
