@@ -1,0 +1,6 @@
+services:
+  field-monitor:
+    build: .
+    image: field-monitor:latest
+    env_file: .env
+    restart: "no"
