@@ -17,6 +17,8 @@ def _config() -> dict:
     return {
         "account_sid": os.getenv("TWILIO_ACCOUNT_SID", ""),
         "auth_token": os.getenv("TWILIO_AUTH_TOKEN", ""),
+        "api_key_sid": os.getenv("TWILIO_API_KEY_SID", ""),
+        "api_key_secret": os.getenv("TWILIO_API_KEY_SECRET", ""),
         "from_number": os.getenv("TWILIO_PHONE_NUMBER", ""),
         "validate_signature": os.getenv("TWILIO_VALIDATE_SIGNATURE", "false").lower() == "true",
     }
@@ -24,7 +26,8 @@ def _config() -> dict:
 
 def is_configured() -> bool:
     c = _config()
-    return bool(c["account_sid"] and c["auth_token"] and c["from_number"])
+    has_auth = bool(c["auth_token"]) or bool(c["api_key_sid"] and c["api_key_secret"])
+    return bool(c["account_sid"] and c["from_number"] and has_auth)
 
 
 def auto_send_enabled() -> bool:
@@ -37,7 +40,13 @@ def _get_client():
     if _client is None:
         from twilio.rest import Client
         c = _config()
-        _client = Client(c["account_sid"], c["auth_token"])
+        # Prefer API Key auth (SK SID + Secret) when present — Twilio's
+        # recommended method. The account SID is still passed so the client
+        # targets the right account. Fall back to Account SID + Auth Token.
+        if c["api_key_sid"] and c["api_key_secret"]:
+            _client = Client(c["api_key_sid"], c["api_key_secret"], c["account_sid"])
+        else:
+            _client = Client(c["account_sid"], c["auth_token"])
     return _client
 
 

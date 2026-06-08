@@ -38,6 +38,11 @@ async def _daily_nudge():
             followups = (await c.fetchone())["n"]
         nudge = await ai_engine.generate_accountability_nudge(completed, pending, overdue, new_leads, followups)
         logger.info("Daily nudge: %s", nudge)
+        eric_phone = os.getenv("ERIC_PHONE_NUMBER", "")
+        if eric_phone:
+            from backend.services import sms as sms_svc
+            result = sms_svc.send_sms(eric_phone, nudge)
+            logger.info("Daily nudge SMS result: %s", result)
     finally:
         await db.close()
 
