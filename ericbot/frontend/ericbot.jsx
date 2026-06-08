@@ -849,6 +849,171 @@ function InboxTab() {
   );
 }
 
+// ── Calls Tab (Zoom Phone) ────────────────────────────────────────────────────
+
+function CallsTab() {
+  const [status, setStatus] = useState(null);
+  const [voicemails, setVoicemails] = useState([]);
+  const [logs, setLogs] = useState([]);
+  const [edits, setEdits] = useState({});
+  const [error, setError] = useState(null);
+
+  const load = async () => {
+    try {
+      setError(null);
+      const [s, v, l] = await Promise.all([
+        apiFetch("/calls/status"),
+        apiFetch("/calls/voicemails"),
+        apiFetch("/calls/logs"),
+      ]);
+      setStatus(s);
+      setVoicemails(v);
+      setLogs(l);
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+  useEffect(() => { load(); }, []);
+
+  const approve = async (vm) => {
+    try {
+      await apiFetch(`/calls/voicemails/${vm.id}/approve`, {
+        method: "POST",
+        body: JSON.stringify({ edited_text: edits[vm.id] ?? vm.draft_reply }),
+      });
+      load();
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+  const reject = async (vm) => {
+    try {
+      await apiFetch(`/calls/voicemails/${vm.id}/reject`, { method: "POST" });
+      load();
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
+  const inp = { background: "#1e1e2e", border: "1px solid #45475a", borderRadius: 6, color: "#cdd6f4", padding: "6px 10px", fontSize: 13, width: "100%" };
+
+  const callTypeColor = (t) => ({ missed: "#f38ba8", voicemail: "#89b4fa", answered: "#a6e3a1", outbound: "#a6e3a1" }[t] || "#6c7086");
+  const fmtTime = (ts) => ts ? new Date(ts).toLocaleString() : "—";
+
+  return (
+    <div>
+      {error && <div style={{ background: "#f38ba822", border: "1px solid #f38ba8", borderRadius: 8, padding: "10px 14px", marginBottom: 16, color: "#f38ba8", fontSize: 13 }}>{error}</div>}
+
+      {/* Zoom status banner */}
+      {status && (
+        <div style={{ background: "#1e1e2e", borderRadius: 12, padding: "12px 16px", marginBottom: 16, borderLeft: `3px solid ${status.configured ? "#a6e3a1" : "#f9e2af"}` }}>
+          <div style={{ fontSize: 13, color: "#cdd6f4" }}>
+            Zoom Phone: <strong style={{ color: status.configured ? "#a6e3a1" : "#f9e2af" }}>{status.configured ? "connected" : "not configured"}</strong>
+            {status.zoom_phone_number && <span style={{ color: "#6c7086" }}> · {status.zoom_phone_number}</span>}
+          </div>
+          {!status.configured && (
+            <div style={{ fontSize: 12, color: "#6c7086", marginTop: 4 }}>
+              Add ZOOM_ACCOUNT_ID, ZOOM_CLIENT_ID, ZOOM_CLIENT_SECRET, and ZOOM_WEBHOOK_SECRET_TOKEN to your .env to enable Zoom Phone.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Voicemail / follow-up queue */}
+      <Card
+        title={`Follow-up Queue${voicemails.length ? ` (${voicemails.length})` : ""}`}
+        action={<button onClick={load} style={{ background: "#313244", color: "#cdd6f4", border: "none", borderRadius: 6, padding: "5px 12px", fontSize: 12, cursor: "pointer" }}>↻ Refresh</button>}
+      >
+        {voicemails.length === 0 ? (
+          <p style={{ color: "#6c7086", fontSize: 13, margin: 0 }}>No voicemails or missed calls waiting. Inbound Zoom calls land here for follow-up.</p>
+        ) : (
+          voicemails.map((vm) => (
+            <div key={vm.id} style={{ background: "#313244", borderRadius: 8, padding: 12, marginBottom: 10, borderLeft: `3px solid ${vm.urgent ? "#f38ba8" : "#45475a"}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                <div>
+                  <strong style={{ color: "#cdd6f4" }}>{vm.contact_name || vm.phone}</strong>
+                  <span style={{ marginLeft: 8, fontSize: 12, color: "#6c7086" }}>{vm.phone}</span>
+                  {vm.urgent ? <span style={{ marginLeft: 8, fontSize: 11, background: "#f38ba822", color: "#f38ba8", borderRadius: 4, padding: "1px 6px" }}>URGENT</span> : null}
+                </div>
+                <span style={{ fontSize: 11, color: "#6c7086" }}>{fmtTime(vm.created_at)}</span>
+              </div>
+
+              {vm.intent && <div style={{ fontSize: 12, color: "#89b4fa", marginBottom: 4 }}>Intent: {vm.intent}</div>}
+
+              {vm.transcript && (
+                <div style={{ background: "#1e1e2e", borderRadius: 6, padding: "8px 10px", marginBottom: 8, fontSize: 12, color: "#a6adc8", fontStyle: "italic" }}>
+                  "{vm.transcript}"
+                </div>
+              )}
+
+              {vm.summary && (
+                <div style={{ fontSize: 12, color: "#6c7086", marginBottom: 8 }}>{vm.summary}</div>
+              )}
+
+              {vm.draft_reply && (
+                <>
+                  <div style={{ fontSize: 12, color: "#6c7086", marginBottom: 4 }}>Follow-up SMS draft:</div>
+                  <textarea
+                    style={{ ...inp, minHeight: 54, resize: "vertical", marginBottom: 8 }}
+                    value={edits[vm.id] ?? vm.draft_reply}
+                    onChange={(e) => setEdits((s) => ({ ...s, [vm.id]: e.target.value }))}
+                  />
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => approve(vm)} style={{ background: "#a6e3a1", color: "#1e1e2e", border: "none", borderRadius: 6, padding: "6px 16px", fontWeight: 700, cursor: "pointer" }}>
+                      ✓ Send Follow-up
+                    </button>
+                    <button onClick={() => reject(vm)} style={{ background: "#45475a", color: "#cdd6f4", border: "none", borderRadius: 6, padding: "6px 16px", cursor: "pointer" }}>
+                      Dismiss
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {!vm.draft_reply && (
+                <button onClick={() => reject(vm)} style={{ background: "#45475a", color: "#cdd6f4", border: "none", borderRadius: 6, padding: "6px 16px", fontSize: 12, cursor: "pointer" }}>
+                  Dismiss reminder
+                </button>
+              )}
+            </div>
+          ))
+        )}
+      </Card>
+
+      {/* Recent call log */}
+      <Card title="Recent Call Log">
+        {logs.length === 0 ? (
+          <p style={{ color: "#6c7086", fontSize: 13, margin: 0 }}>No calls recorded yet.</p>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid #313244", color: "#6c7086" }}>
+                  <th style={{ textAlign: "left", padding: "6px 8px" }}>When</th>
+                  <th style={{ textAlign: "left", padding: "6px 8px" }}>From</th>
+                  <th style={{ textAlign: "left", padding: "6px 8px" }}>Type</th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs.map((l) => (
+                  <tr key={l.id} style={{ borderBottom: "1px solid #313244" }}>
+                    <td style={{ padding: "6px 8px", color: "#6c7086" }}>{fmtTime(l.created_at)}</td>
+                    <td style={{ padding: "6px 8px", color: "#cdd6f4" }}>{l.contact_name || l.phone}</td>
+                    <td style={{ padding: "6px 8px" }}>
+                      <span style={{ fontSize: 12, background: callTypeColor(l.call_type) + "22", color: callTypeColor(l.call_type), borderRadius: 4, padding: "1px 8px" }}>
+                        {l.call_type}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 // ── App Shell ─────────────────────────────────────────────────────────────────
 
 const TABS = [
@@ -857,6 +1022,7 @@ const TABS = [
   { id: "leads", label: "Leads", emoji: "🎯" },
   { id: "tasks", label: "Tasks", emoji: "✅" },
   { id: "inbox", label: "Inbox", emoji: "📱" },
+  { id: "calls", label: "Calls", emoji: "📞" },
   { id: "voice", label: "Voice", emoji: "🎤" },
   { id: "draft", label: "Draft", emoji: "✍" },
 ];
@@ -870,6 +1036,7 @@ export default function EricBot() {
     leads: <LeadsTab />,
     tasks: <TasksTab />,
     inbox: <InboxTab />,
+    calls: <CallsTab />,
     voice: <VoiceTab />,
     draft: <DraftTab />,
   };

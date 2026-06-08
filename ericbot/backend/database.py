@@ -100,5 +100,34 @@ async def init_db():
                 resolved INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
+
+            -- Zoom Phone integration -----------------------------------------
+
+            CREATE TABLE IF NOT EXISTS call_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                contact_id INTEGER,
+                phone TEXT NOT NULL,
+                direction TEXT NOT NULL DEFAULT 'in',   -- 'in' | 'out'
+                -- missed | voicemail | answered | outbound
+                call_type TEXT NOT NULL DEFAULT 'missed',
+                status TEXT NOT NULL DEFAULT 'missed',
+                zoom_call_id TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS voicemails (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                contact_id INTEGER,
+                phone TEXT NOT NULL,
+                call_log_id INTEGER,
+                zoom_voicemail_id TEXT,
+                transcript TEXT DEFAULT '',
+                intent TEXT,
+                summary TEXT,
+                draft_reply TEXT,
+                urgent INTEGER DEFAULT 0,
+                resolved INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
         """)
         await db.commit()

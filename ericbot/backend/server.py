@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.database import init_db, get_db
-from backend.routers import chat, voice, leads, tasks, dashboard, sms
+from backend.routers import chat, voice, leads, tasks, dashboard, sms, calls
 from backend.services.scheduler import start_scheduler, stop_scheduler
 
 logging.basicConfig(level=logging.INFO)
@@ -97,6 +97,7 @@ app.include_router(leads.router)
 app.include_router(tasks.router)
 app.include_router(dashboard.router)
 app.include_router(sms.router)
+app.include_router(calls.router)
 
 
 @app.get("/api/health")

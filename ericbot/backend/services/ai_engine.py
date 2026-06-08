@@ -201,6 +201,70 @@ texts — first person, his voice. Just the message body, nothing else."""
     return response.content[0].text.strip()
 
 
+async def classify_voicemail(transcript: str) -> dict:
+    """Triage a voicemail transcript.
+
+    Returns {"urgent": bool, "intent": str, "summary": str}
+    """
+    if not transcript.strip():
+        return {"urgent": False, "intent": "no transcript", "summary": "No voicemail transcript available."}
+
+    prompt = f"""Classify this voicemail transcript left for a business owner.
+
+Transcript: "{transcript}"
+
+Respond with ONLY a JSON object:
+{{"urgent": true|false, "intent": "<3-5 word summary>", "summary": "<1 sentence describing what the caller wants>"}}
+
+"urgent" is true for: pricing requests, job scheduling, complaints, emergencies, time-sensitive asks.
+"urgent" is false for: general inquiries, thanks, casual callbacks, confirmations."""
+
+    try:
+        response = await get_client().messages.create(
+            model=MODEL,
+            max_tokens=120,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        import json
+        text = response.content[0].text.strip()
+        start, end = text.find("{"), text.rfind("}")
+        data = json.loads(text[start : end + 1]) if start >= 0 else {}
+        return {
+            "urgent": bool(data.get("urgent", False)),
+            "intent": str(data.get("intent", "general inquiry"))[:60],
+            "summary": str(data.get("summary", ""))[:200],
+        }
+    except Exception:
+        return {"urgent": False, "intent": "needs review", "summary": ""}
+
+
+async def draft_call_followup_sms(
+    caller_name: str,
+    venture: str,
+    transcript: str,
+    style_context: str = "",
+) -> str:
+    """Draft a follow-up text Eric can send after a missed call."""
+    system = ERIC_SYSTEM
+    if style_context:
+        system += f"\n\n{style_context}"
+
+    context = f'They left a voicemail: "{transcript[:400]}"' if transcript else "They called but didn't leave a voicemail."
+
+    prompt = f"""{caller_name} called Eric and he missed it. {context}
+
+Draft a short, natural follow-up text Eric can send. Sound like him — direct, warm, no fluff.
+Keep it under 2 sentences. Just the message body, nothing else."""
+
+    response = await get_client().messages.create(
+        model=MODEL,
+        max_tokens=200,
+        system=system,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return response.content[0].text.strip()
+
+
 async def generate_away_reply(recipient_name: str, style_context: str = "") -> str:
     """An HONEST 'I'm tied up' status text — never pretends Eric is present.
 

@@ -120,3 +120,10 @@ class ApprovalRequest(BaseModel):
 class ManualSend(BaseModel):
     phone: str
     body: str
+
+
+# ── Zoom Phone integration ────────────────────────────────────────────────────
+
+
+class VoicemailApproval(BaseModel):
+    edited_text: Optional[str] = None  # if omitted, original draft is sent
