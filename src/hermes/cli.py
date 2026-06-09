@@ -35,6 +35,8 @@ def _build_parser() -> argparse.ArgumentParser:
     chat.add_argument("-c", "--continue", dest="cont", action="store_true")
     chat.add_argument("-r", "--resume", metavar="SESSION_ID")
     chat.add_argument("-w", "--worktree", action="store_true")
+
+    sub.add_parser("watch", help="Run the autonomous Gmail+SMS responder daemon")
     return p
 
 
@@ -110,6 +112,10 @@ def _run_interactive(agent: Agent) -> int:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
+
+    if getattr(args, "command", None) == "watch":
+        from .watcher.__main__ import main as watcher_main
+        return watcher_main()
 
     if getattr(args, "worktree", False):
         path = create_worktree()

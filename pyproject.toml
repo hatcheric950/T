@@ -15,13 +15,21 @@ dependencies = [
     "mcp>=1.0.0",
     "prompt_toolkit>=3.0.43",
     "rich>=13.7.0",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "aioimaplib>=1.1.0",
+    "aiosmtplib>=3.0",
+    "aiosqlite>=0.20",
+    "twilio>=9.0",
+    "pydantic-settings>=2.2",
+    "PyYAML>=6.0",
 ]
 
 [project.scripts]
 hermes = "hermes.cli:main"
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "httpx>=0.27"]
 
 [tool.setuptools.dynamic]
 version = { attr = "hermes.__version__" }
@@ -31,3 +39,4 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_mode = "auto"
