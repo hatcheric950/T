@@ -36,7 +36,9 @@ def _build_parser() -> argparse.ArgumentParser:
     chat.add_argument("-r", "--resume", metavar="SESSION_ID")
     chat.add_argument("-w", "--worktree", action="store_true")
 
-    sub.add_parser("watch", help="Run the autonomous Gmail+SMS responder daemon")
+    watch = sub.add_parser("watch", help="Run the autonomous Gmail+SMS responder daemon")
+    watch.add_argument("--check", action="store_true",
+                       help="Validate /etc/hermes/env + allowlist and exit (do not start listeners)")
     audit = sub.add_parser("audit", help="Inspect watcher audit log")
     audit.add_argument("--db", default="/var/lib/hermes/state.db")
     audit.add_argument("--limit", type=int, default=25)
@@ -121,6 +123,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if getattr(args, "command", None) == "watch":
+        if getattr(args, "check", False):
+            from .watcher.check import main as check_main
+            return check_main()
         from .watcher.__main__ import main as watcher_main
         return watcher_main()
 
