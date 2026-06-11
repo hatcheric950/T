@@ -37,6 +37,13 @@ def _build_parser() -> argparse.ArgumentParser:
     chat.add_argument("-w", "--worktree", action="store_true")
 
     sub.add_parser("watch", help="Run the autonomous Gmail+SMS responder daemon")
+    audit = sub.add_parser("audit", help="Inspect watcher audit log")
+    audit.add_argument("--db", default="/var/lib/hermes/state.db")
+    audit.add_argument("--limit", type=int, default=25)
+    audit.add_argument("--since-hours", type=float, default=0)
+    audit.add_argument("--decision")
+    audit.add_argument("--sender")
+    audit.add_argument("--show-drafts", action="store_true")
     return p
 
 
@@ -116,6 +123,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     if getattr(args, "command", None) == "watch":
         from .watcher.__main__ import main as watcher_main
         return watcher_main()
+
+    if getattr(args, "command", None) == "audit":
+        from .watcher.audit import run as audit_run
+        audit_argv = ["--db", args.db, "--limit", str(args.limit),
+                      "--since-hours", str(args.since_hours)]
+        if args.decision: audit_argv += ["--decision", args.decision]
+        if args.sender: audit_argv += ["--sender", args.sender]
+        if args.show_drafts: audit_argv += ["--show-drafts"]
+        return audit_run(audit_argv)
 
     if getattr(args, "worktree", False):
         path = create_worktree()

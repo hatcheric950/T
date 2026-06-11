@@ -96,6 +96,55 @@ hermes chat --toolsets hostinger -q "list my domains"
 Currently supported transport: `stdio`. Tool calls work with
 `--provider anthropic` (default).
 
+## Autonomous responder (`hermes watch`)
+
+A long-running daemon that handles inbound Gmail (IMAP IDLE) and Twilio SMS,
+runs each message through the existing `Agent`, and replies on your behalf.
+Defaults to **shadow mode** — full pipeline runs, drafts logged, nothing sent
+— until `HERMES_MODE=live`.
+
+### Safety rails (all on by default)
+
+- **Allowlist-only** (`/etc/hermes/allowlist.yaml`) — only listed senders get
+  replies. `*@domain` globs supported for email; phones must be E.164.
+- **Denylist patterns** — `noreply@*`, `mailer-daemon@*`, short-code numbers,
+  etc. always dropped.
+- **Rate caps** — 20 replies/hour and 5 replies/sender/24h.
+- **SMS budget** — `$2/day` default; exhaustion drops further SMS.
+- **Dedup** — never reply twice to the same `Message-ID` / `MessageSid`.
+- **Kill switch** — `touch /etc/hermes/PAUSE` blocks all sends instantly.
+
+### Deploy (Ubuntu 24.04 VPS, as root)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hatcheric950/T/main/deploy/bootstrap.sh | bash
+```
+
+Installs Python, `cloudflared`, the venv, the systemd unit, and scaffolds
+`/etc/hermes/{env,allowlist.yaml}`. The installer prints a numbered checklist
+for the remaining steps (fill in secrets, run `cloudflared tunnel login`,
+point Twilio webhook, run for 24h in shadow, flip to live).
+
+Cloudflare Tunnel terminates TLS — no Let's Encrypt or A-record juggling.
+
+### Reviewing shadow logs
+
+```bash
+hermes audit --since-hours 24 --show-drafts
+hermes audit --decision shadow_would_send
+hermes audit --sender alice@example.com
+```
+
+Decisions, sender, sent/not, cost, and (optionally) the LLM's drafted reply.
+Use this for 24h of shadow review before flipping to live.
+
+### Going live
+
+```bash
+sed -i 's/^HERMES_MODE=.*/HERMES_MODE=live/' /etc/hermes/env
+systemctl restart hermes-watcher
+```
+
 ## Releasing
 
 Releases are published to PyPI by `.github/workflows/release.yml` when a
