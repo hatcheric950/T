@@ -1,2 +1,166 @@
-# T
-Gh
+# hermes
+
+A multi-provider chat CLI agent.
+
+## Install
+
+Requires Python 3.10+.
+
+```bash
+pip install -e ".[dev]"   # runtime + test deps
+hermes --version          # sanity check -> hermes 0.1.0
+python -m pytest -q       # run the test suite
+```
+
+For runtime only (no tests): `pip install -e .`
+
+## Usage
+
+```bash
+# Start an interactive session (default)
+hermes
+
+# Single query mode (non-interactive)
+hermes chat -q "Hello"
+
+# With a specific model
+hermes chat --model "anthropic/claude-sonnet-4-6"
+
+# With a specific provider
+hermes chat --provider nous        # Use Nous Portal
+hermes chat --provider openrouter  # Force OpenRouter
+
+# With specific toolsets
+hermes chat --toolsets "web,terminal,skills"
+
+# Start with one or more skills preloaded
+hermes -s hermes-agent-dev,github-auth
+hermes chat -s github-pr-workflow -q "open a draft PR"
+
+# Resume previous sessions
+hermes --continue             # Resume the most recent CLI session (-c)
+hermes --resume <session_id>  # Resume a specific session by ID (-r)
+
+# Verbose mode (debug output)
+hermes chat --verbose
+
+# Isolated git worktree (for running multiple agents in parallel)
+hermes -w                         # Interactive mode in worktree
+hermes -w -q "Fix issue #123"     # Single query in worktree
+```
+
+## Environment
+
+- `ANTHROPIC_API_KEY` — Anthropic provider
+- `OPENROUTER_API_KEY` — OpenRouter provider
+- `NOUS_API_KEY` — Nous Portal provider
+- `HERMES_HOME` — override config/sessions/skills root (default `~/.hermes`)
+
+## Layout
+
+- `~/.hermes/sessions/<id>.json` — persisted conversations
+- `~/.hermes/skills/<name>.md` — local skill prompts loaded via `-s`
+- `~/.hermes/mcp.json` (or repo-local `./.hermes/mcp.json`) — MCP server
+  definitions exposed as `--toolsets <name>`
+
+## MCP toolsets
+
+Any server defined in `mcp.json` becomes available as a toolset. Example
+(Hostinger):
+
+```bash
+mkdir -p ~/.hermes && cat > ~/.hermes/mcp.json <<'JSON'
+{
+  "inputs": [
+    { "id": "api_token", "description": "Hostinger API token" }
+  ],
+  "servers": {
+    "hostinger": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["hostinger-api-mcp@latest"],
+      "env": { "API_TOKEN": "${input:api_token}" }
+    }
+  }
+}
+JSON
+
+export HERMES_INPUT_API_TOKEN=...   # skip the interactive prompt
+hermes chat --toolsets hostinger -q "list my domains"
+```
+
+`${input:<id>}` placeholders resolve in this order:
+1. env var `HERMES_INPUT_<ID>` (uppercased, `-` → `_`)
+2. interactive prompt (TTY only; cached for the session)
+
+Currently supported transport: `stdio`. Tool calls work with
+`--provider anthropic` (default).
+
+## Autonomous responder (`hermes watch`)
+
+A long-running daemon that handles inbound Gmail (IMAP IDLE) and Twilio SMS,
+runs each message through the existing `Agent`, and replies on your behalf.
+Defaults to **shadow mode** — full pipeline runs, drafts logged, nothing sent
+— until `HERMES_MODE=live`.
+
+### Safety rails (all on by default)
+
+- **Allowlist-only** (`/etc/hermes/allowlist.yaml`) — only listed senders get
+  replies. `*@domain` globs supported for email; phones must be E.164.
+- **Denylist patterns** — `noreply@*`, `mailer-daemon@*`, short-code numbers,
+  etc. always dropped.
+- **Rate caps** — 20 replies/hour and 5 replies/sender/24h.
+- **SMS budget** — `$2/day` default; exhaustion drops further SMS.
+- **Dedup** — never reply twice to the same `Message-ID` / `MessageSid`.
+- **Kill switch** — `touch /etc/hermes/PAUSE` blocks all sends instantly.
+
+### Deploy (Ubuntu 24.04 VPS, as root)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hatcheric950/T/main/deploy/bootstrap.sh | bash
+```
+
+Installs Python, `cloudflared`, the venv, the systemd unit, and scaffolds
+`/etc/hermes/{env,allowlist.yaml}`. The installer prints a numbered checklist
+for the remaining steps (fill in secrets, run `cloudflared tunnel login`,
+point Twilio webhook, run for 24h in shadow, flip to live).
+
+Cloudflare Tunnel terminates TLS — no Let's Encrypt or A-record juggling.
+
+### Reviewing shadow logs
+
+```bash
+hermes audit --since-hours 24 --show-drafts
+hermes audit --decision shadow_would_send
+hermes audit --sender alice@example.com
+```
+
+Decisions, sender, sent/not, cost, and (optionally) the LLM's drafted reply.
+Use this for 24h of shadow review before flipping to live.
+
+### Going live
+
+```bash
+sed -i 's/^HERMES_MODE=.*/HERMES_MODE=live/' /etc/hermes/env
+systemctl restart hermes-watcher
+```
+
+## Releasing
+
+Releases are published to PyPI by `.github/workflows/release.yml` when a
+`v*` tag is pushed. The package version is single-sourced from
+`src/hermes/__init__.py` (`__version__`).
+
+```bash
+# 1. bump the version
+#    edit src/hermes/__init__.py -> __version__ = "X.Y.Z"
+# 2. commit, tag, push
+git commit -am "Release vX.Y.Z"
+git tag vX.Y.Z
+git push && git push --tags
+```
+
+The workflow checks the tag matches `__version__`, builds the sdist +
+wheel, and uploads to PyPI via trusted publishing (OIDC) — no API token is
+stored. One-time setup: register a PyPI trusted publisher for this repo
+with workflow `release.yml` and environment `pypi`.

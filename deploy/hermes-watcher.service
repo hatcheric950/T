@@ -1,0 +1,22 @@
+[Unit]
+Description=Hermes autonomous responder (Gmail + Twilio SMS)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/hermes
+EnvironmentFile=/etc/hermes/env
+ExecStart=/opt/hermes/.venv/bin/hermes watch
+Restart=on-failure
+RestartSec=5
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/hermes /var/log/hermes /etc/hermes
+
+[Install]
+WantedBy=multi-user.target

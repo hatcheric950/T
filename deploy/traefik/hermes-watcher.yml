@@ -1,0 +1,15 @@
+http:
+  routers:
+    hermes-watcher:
+      rule: "Host(`HERMES_HOSTNAME_PLACEHOLDER`) && (PathPrefix(`/sms/inbound`) || Path(`/healthz`))"
+      entryPoints:
+        - websecure
+      service: hermes-watcher
+      tls:
+        certResolver: letsencrypt
+
+  services:
+    hermes-watcher:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:8000"
