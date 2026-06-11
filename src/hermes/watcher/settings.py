@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     anthropic_api_key: str = Field(default="", alias="ANTHROPIC_API_KEY")
     model: str = Field(default="anthropic/claude-sonnet-4-6", alias="HERMES_MODEL")
     classifier_model: str = Field(
-        default="claude-haiku-4-5-20251001", alias="HERMES_CLASSIFIER_MODEL"
+        default="claude-haiku-4-5", alias="HERMES_CLASSIFIER_MODEL"
     )
 
     gmail_address: str = Field(default="", alias="GMAIL_ADDRESS")
