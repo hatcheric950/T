@@ -2,7 +2,19 @@ import os
 from typing import List, Dict, Optional
 import anthropic
 
-MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6")
+# xAI (Grok) keys start with "xai-". xAI exposes an Anthropic-compatible API,
+# so the same SDK works — we just point it at api.x.ai and use a Grok model.
+def _is_xai_key() -> bool:
+    return os.getenv("ANTHROPIC_API_KEY", "").startswith("xai-")
+
+
+def _default_model() -> str:
+    if os.getenv("CLAUDE_MODEL"):
+        return os.getenv("CLAUDE_MODEL")
+    return "grok-4" if _is_xai_key() else "claude-sonnet-4-6"
+
+
+MODEL = _default_model()
 
 _client: Optional[anthropic.AsyncAnthropic] = None
 
@@ -10,7 +22,10 @@ _client: Optional[anthropic.AsyncAnthropic] = None
 def get_client() -> anthropic.AsyncAnthropic:
     global _client
     if _client is None:
-        _client = anthropic.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        kwargs = {"api_key": os.getenv("ANTHROPIC_API_KEY")}
+        if _is_xai_key():
+            kwargs["base_url"] = "https://api.x.ai"
+        _client = anthropic.AsyncAnthropic(**kwargs)
     return _client
 
 
