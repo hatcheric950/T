@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "context": {
+      "type": "http",
+      "url": "https://context.era.app",
+      "headers": {
+        "Authorization": "Bearer {{API_KEY}}"
+      }
+    }
+  }
+}
