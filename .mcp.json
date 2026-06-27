@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "webull": {
+      "command": "uvx",
+      "args": ["webull-openapi-mcp", "serve"],
+      "env": {
+        "WEBULL_APP_KEY": "${WEBULL_APP_KEY}",
+        "WEBULL_APP_SECRET": "${WEBULL_APP_SECRET}",
+        "WEBULL_REGION_ID": "${WEBULL_REGION_ID:-us}",
+        "WEBULL_ENVIRONMENT": "${WEBULL_ENVIRONMENT:-prod}"
+      }
+    }
+  }
+}
