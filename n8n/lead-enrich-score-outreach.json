@@ -1,0 +1,157 @@
+{
+  "name": "Lead Enrich → Score → Outreach → Offer",
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": { "item": [ { "mode": "everyMinute" } ] },
+        "documentId": { "__rl": true, "value": "YOUR_SHEET_ID", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "Sheet1", "mode": "name" },
+        "event": "rowAdded",
+        "options": {}
+      },
+      "id": "trigger-1",
+      "name": "Google Sheet Trigger",
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [ 240, 300 ],
+      "credentials": { "googleSheetsTriggerOAuth2Api": { "id": "REPLACE_ME", "name": "Google Sheets Trigger account" } }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apollo.io/v1/people/match",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "Content-Type", "value": "application/json" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"first_name\": \"{{ ($json.Name || '').split(' ')[0] }}\",\n  \"last_name\": \"{{ ($json.Name || '').split(' ').slice(1).join(' ') }}\",\n  \"organization_name\": \"{{ $json.Company }}\",\n  \"reveal_personal_emails\": true\n}",
+        "options": {}
+      },
+      "id": "apollo-1",
+      "name": "Apollo Enrich",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [ 460, 300 ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": { "httpHeaderAuth": { "id": "REPLACE_ME", "name": "Apollo X-Api-Key" } }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// PLACEHOLDER SCORING — swap for your real intent source.\n// Apollo's people/match returns the record under `person`.\nconst r = $json.person || $json;\nconst trigger = $('Google Sheet Trigger').item.json;\n\nlet score = 0;\nconst title = (r.title || '').toLowerCase();\nif (/(founder|owner|ceo|cto|cmo|chief|vp|head|director)/.test(title)) score += 40;\nif (r.email_status === 'verified') score += 25;\nconst size = (r.organization && r.organization.estimated_num_employees) || 0;\nif (size > 50) score += 20;\nif (size > 500) score += 15;\n\nreturn {\n  json: {\n    Name: trigger.Name,\n    Company: trigger.Company,\n    email: r.email || trigger.email || '',\n    title: r.title || '',\n    linkedin_url: r.linkedin_url || '',\n    intent_score: Math.min(score, 100)\n  }\n};"
+      },
+      "id": "score-1",
+      "name": "Score Lead",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [ 680, 300 ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": { "__rl": true, "value": "YOUR_SHEET_ID", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "Sheet1", "mode": "name" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [ "Name" ],
+          "value": {
+            "Name": "={{ $json.Name }}",
+            "email": "={{ $json.email }}",
+            "title": "={{ $json.title }}",
+            "intent_score": "={{ $json.intent_score }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "save-1",
+      "name": "Save Enriched Data",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [ 900, 300 ],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "REPLACE_ME", "name": "Google Sheets account" } }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.intent_score }}",
+              "rightValue": 70,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-1",
+      "name": "IF High Score",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [ 1120, 300 ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.heyreach.io/api/public/campaign/AddLeadsToCampaignV2",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "Content-Type", "value": "application/json" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"campaignId\": YOUR_HEYREACH_CAMPAIGN_ID,\n  \"accountLeadPairs\": [\n    {\n      \"lead\": {\n        \"firstName\": \"{{ ($json.Name || '').split(' ')[0] }}\",\n        \"lastName\": \"{{ ($json.Name || '').split(' ').slice(1).join(' ') }}\",\n        \"companyName\": \"{{ $json.Company }}\",\n        \"emailAddress\": \"{{ $json.email }}\",\n        \"profileUrl\": \"{{ $json.linkedin_url }}\"\n      }\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "heyreach-1",
+      "name": "HeyReach Send",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [ 1360, 200 ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": { "httpHeaderAuth": { "id": "REPLACE_ME", "name": "HeyReach X-API-KEY" } }
+    },
+    {
+      "parameters": {
+        "fromEmail": "you@yourdomain.com",
+        "toEmail": "={{ $json.email }}",
+        "subject": "A resource I think you'll find useful",
+        "emailFormat": "text",
+        "text": "=Hi {{ ($json.Name || '').split(' ')[0] }},\n\nBased on what you're working on at {{ $json.Company }}, I put together something that might help.\n\nGrab it here: https://YOUR_GUMROAD_LINK\n\nBest,\nYour Name",
+        "options": {}
+      },
+      "id": "gumroad-1",
+      "name": "Send Gumroad Offer",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [ 1580, 200 ],
+      "credentials": { "smtp": { "id": "REPLACE_ME", "name": "SMTP account" } }
+    },
+    {
+      "parameters": {},
+      "id": "noop-1",
+      "name": "Low Score - Skip",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [ 1360, 400 ]
+    }
+  ],
+  "connections": {
+    "Google Sheet Trigger": { "main": [ [ { "node": "Apollo Enrich", "type": "main", "index": 0 } ] ] },
+    "Apollo Enrich": { "main": [ [ { "node": "Score Lead", "type": "main", "index": 0 } ] ] },
+    "Score Lead": { "main": [ [ { "node": "Save Enriched Data", "type": "main", "index": 0 } ] ] },
+    "Save Enriched Data": { "main": [ [ { "node": "IF High Score", "type": "main", "index": 0 } ] ] },
+    "IF High Score": { "main": [ [ { "node": "HeyReach Send", "type": "main", "index": 0 } ], [ { "node": "Low Score - Skip", "type": "main", "index": 0 } ] ] },
+    "HeyReach Send": { "main": [ [ { "node": "Send Gumroad Offer", "type": "main", "index": 0 } ] ] }
+  }
+}
